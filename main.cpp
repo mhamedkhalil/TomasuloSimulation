@@ -233,10 +233,43 @@ void Parser(string& instructionsFile)
     instStream.close();
 }
 
+void UserInput()
+{
+    //Assuming the user will input only integers as required
+    cout << "Choose the Hardware components that you require for the simulation:\n";
+    cout << "Number of Load Stations: "; cin >> LOAD_UNITS;
+    cout << "Number of Store Stations: "; cin >> STORE_UNITS;
+    cout << "Number of BEQ Stations: "; cin >> BEQ_UNITS;
+    cout << "Number of Call/Return Stations: "; cin >> CALL_UNITS;
+    cout << "Number of ADD/ADDI Stations: "; cin >> ADD_UNITS;
+    cout << "Number of NAND Stations: "; cin >> NAND_UNITS;
+    cout << "Number of Multiplication Stations: "; cin >> MUL_UNITS;
+    cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    cout << "Initializing Hardware...\n";
+    loadStation.resize(LOAD_UNITS);
+    storeStation.resize(STORE_UNITS);
+    beqStation.resize(BEQ_UNITS);
+    callStation.resize(CALL_UNITS);
+    addStation.resize(ADD_UNITS);
+    nandStation.resize(NAND_UNITS);
+    mulStation.resize(MUL_UNITS);
+    cout << "Choose the execution time of each station (in clock cycles):\n";
+    cout << "EXEC time of LOAD: "; cin >> LOAD_UNITS_CYCLES;
+    cout << "EXEC time of STORE: "; cin >> STORE_UNITS_CYCLES;
+    cout << "EXEC time of BRANCH: "; cin >> BEQ_UNITS_CYCLES;
+    cout << "EXEC time of CALL: "; cin >> CALL_UNITS_CYCLES;
+    cout << "EXEC time of ADD/ADDI: "; cin >> ADD_UNITS_CYCLES;
+    cout << "EXEC time of NAND: "; cin >> NAND_UNITS_CYCLES;
+    cout << "EXEC time of MUL: "; cin >> MUL_UNITS_CYCLES;
+    cout << "Clock cycles registered successfully!\n";
+    cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+}
+
 int main() {
+
+    UserInput();
     // Create a sample instruction file
     string fileName = "instructions.txt";
-
     // Parse the file
     Parser(fileName);
 
