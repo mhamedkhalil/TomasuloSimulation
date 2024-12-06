@@ -17,8 +17,8 @@ class reservationStation
         Op = "";
         Vj = -1;
         Vk = -1;
-        Qj = NULL;
-        Qk = NULL;
+        Qj = nullptr;
+        Qk = nullptr;
         A  = -1;
         Busy  = 0;
     }
