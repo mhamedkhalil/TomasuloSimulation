@@ -11,7 +11,7 @@ struct ROBEntry
     int dest;                 
     int value;                
     bool ready;               
-    bool valid;               
+    bool free = 1;               
 };
 vector<ROBEntry> ROB(ROB_ENTRIES);
 int ROB_head = 0, ROB_tail = 0;

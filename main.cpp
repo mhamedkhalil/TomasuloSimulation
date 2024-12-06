@@ -307,20 +307,23 @@ int ISSUE()
         
     Instruction currentInst = Instructions[PC/4];
     vector<reservationStation>& stationGroup = *Stations[currentInst.Op];
-    
     for(auto &station: stationGroup)
     {
         if(!station.Busy)
         {
-            if ((ROB_tail + 1) % ROB_ENTRIES == ROB_head) 
+            cout << "Head: " << ROB_head << endl;
+                cout << "Tail: " << ROB_tail << endl;
+                cout << "Free: " << ROB[ROB_tail].free << endl;
+            
+            if ((ROB_tail + 1) % ROB_ENTRIES == ROB_head && !ROB[ROB_tail].free) 
             {
                 cout << "ROB is full. Stalling.\n";
                 return -1; // Stall
             }
 
             ROBEntry& robEntry = ROB[ROB_tail];
-            ROB_tail = (ROB_tail + 1) % ROB_ENTRIES;
-            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, true};
+            ROB_tail = (ROB_tail + 1) % ROB_ENTRIES == ROB_head ? ROB_tail : (ROB_tail + 1) % ROB_ENTRIES;
+            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false};
             RF[currentInst.dest].Qi = &robEntry;
             RF[currentInst.dest].busy = true;
 
@@ -336,10 +339,9 @@ int ISSUE()
             PC += 4; 
             return 1;
         }
-
-        cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
-        return -1;
     }
+    cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
+    return -1;
     
 }
 
@@ -360,6 +362,31 @@ int main() {
              << "src1=" << inst.src1 << ", "
              << "src2=" << inst.src2 << endl;
     }
+
+    cout << "=== Starting Issuance ===\n";
+    while (true) {
+        int result = ISSUE();
+
+        if (result == 0) {
+            cout << "All instructions issued successfully.\n";
+            break;
+        } else if (result == -1) {
+            cout << "Stall detected. Unable to issue instruction.\n";
+        } else if (result == 1) {
+            cout << "Instruction issued.\n";
+        }
+
+        // Simulate clock tick
+        Clock++;
+        if (Clock > 30) {
+            cout << "Exceeded clock limit. Stopping simulation.\n";
+            break;
+        }
+    }
+
+    // Step 5: Final status
+    cout << "\nFinal PC: " << PC << endl;
+    cout << "Total Clock Cycles: " << Clock << endl;
 
     return 0;
 }
