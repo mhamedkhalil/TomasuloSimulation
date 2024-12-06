@@ -2,13 +2,27 @@
 #include<vector>
 using namespace std;
 
+#define ROB_ENTRIES 6
+
+struct ROBEntry 
+{
+    int id;                  
+    string Op;              
+    int dest;                 
+    int value;                
+    bool ready;               
+    bool valid;               
+};
+vector<ROBEntry> ROB(ROB_ENTRIES);
+int ROB_head = 0, ROB_tail = 0;
+
 class reservationStation
 {
     public:
     string Op;
     int Vj, Vk;
-    reservationStation* Qj;
-    reservationStation* Qk;
+    ROBEntry* Qj;
+    ROBEntry* Qk;
     int A;
     bool Busy;
 

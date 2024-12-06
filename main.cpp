@@ -3,8 +3,20 @@
 #include<sstream>
 #include<unordered_map>
 #include<exception>
-#include"RF.h"
+#include"ReservationStation.h"
 using namespace std;
+
+#define REGISTER_NUM 16
+
+struct Reg
+{
+    ROBEntry* Qi = nullptr;
+    int value = 0;
+    bool busy = false;
+};
+vector<Reg> RF(REGISTER_NUM);
+
+
 
 int LOAD_UNITS, LOAD_UNITS_CYCLES; 
 int STORE_UNITS, STORE_UNITS_CYCLES;
@@ -15,8 +27,9 @@ int NAND_UNITS, NAND_UNITS_CYCLES;
 int MUL_UNITS, MUL_UNITS_CYCLES;
 
 int DM[128];
-int Clock;
-int PC;
+int Clock = 0;
+int PC = 0;
+
 vector<reservationStation> loadStation;
 vector<reservationStation> storeStation;
 vector<reservationStation> beqStation;
@@ -24,6 +37,9 @@ vector<reservationStation> callStation;
 vector<reservationStation> addStation;
 vector<reservationStation> nandStation;
 vector<reservationStation> mulStation;
+
+unordered_map<string,vector<reservationStation>*> Stations;
+unordered_map<string, int> Stations_Time; 
 
 struct Instruction
 {
@@ -253,6 +269,16 @@ void UserInput()
     addStation.resize(ADD_UNITS);
     nandStation.resize(NAND_UNITS);
     mulStation.resize(MUL_UNITS);
+
+    Stations["LW"] = &loadStation;
+    Stations["SW"] = &storeStation;
+    Stations["BEQ"] = &beqStation;
+    Stations["JAL"] = &callStation;
+    Stations["ADD"] = &addStation;
+    Stations["ADDI"] = &addStation;
+    Stations["NAND"] = &nandStation;
+    Stations["MUL"] = &mulStation;
+
     cout << "Choose the execution time of each station (in clock cycles):\n";
     cout << "EXEC time of LOAD: "; cin >> LOAD_UNITS_CYCLES;
     cout << "EXEC time of STORE: "; cin >> STORE_UNITS_CYCLES;
@@ -263,6 +289,58 @@ void UserInput()
     cout << "EXEC time of MUL: "; cin >> MUL_UNITS_CYCLES;
     cout << "Clock cycles registered successfully!\n";
     cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+
+    Stations_Time["LW"] = LOAD_UNITS_CYCLES;
+    Stations_Time["SW"] = STORE_UNITS_CYCLES;
+    Stations_Time["BEQ"] = BEQ_UNITS_CYCLES;
+    Stations_Time["JAL"] = CALL_UNITS_CYCLES;
+    Stations_Time["ADD"] = ADD_UNITS_CYCLES;
+    Stations_Time["ADDI"] = ADD_UNITS_CYCLES;
+    Stations_Time["NAND"] = NAND_UNITS_CYCLES;
+    Stations_Time["MUL"] = MUL_UNITS_CYCLES;
+}
+
+int ISSUE()
+{
+    if(PC/4 >= Instructions.size())
+        return 0; //No more instructions to isssue
+        
+    Instruction currentInst = Instructions[PC/4];
+    vector<reservationStation>& stationGroup = *Stations[currentInst.Op];
+    
+    for(auto &station: stationGroup)
+    {
+        if(!station.Busy)
+        {
+            if ((ROB_tail + 1) % ROB_ENTRIES == ROB_head) 
+            {
+                cout << "ROB is full. Stalling.\n";
+                return -1; // Stall
+            }
+
+            ROBEntry& robEntry = ROB[ROB_tail];
+            ROB_tail = (ROB_tail + 1) % ROB_ENTRIES;
+            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, true};
+            RF[currentInst.dest].Qi = &robEntry;
+            RF[currentInst.dest].busy = true;
+
+            station.Op = currentInst.Op;
+            station.Busy = true;
+            station.Qj = RF[currentInst.src1].Qi;
+            station.Qk = RF[currentInst.src2].Qi;
+            station.Vj = (station.Qj == nullptr) ? RF[currentInst.src1].value : 0;
+            station.Vk = (station.Qk == nullptr) ? RF[currentInst.src2].value : 0;
+            station.A = currentInst.dest;
+
+            cout << "Issued instruction: " << currentInst.Op << " to a reservation station.\n";
+            PC += 4; 
+            return 1;
+        }
+
+        cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
+        return -1;
+    }
+    
 }
 
 int main() {
