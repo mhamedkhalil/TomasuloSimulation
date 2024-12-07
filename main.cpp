@@ -15,8 +15,14 @@ struct Reg
     bool busy = false;
 };
 vector<Reg> RF(REGISTER_NUM);
+void clearRegister(Reg* target)
+{
+    target->busy = false;
+    target->Qi = nullptr;
+    target->value = 0;
+}
 
-
+bool speculate = 0;
 
 int LOAD_UNITS, LOAD_UNITS_CYCLES; 
 int STORE_UNITS, STORE_UNITS_CYCLES;
@@ -260,6 +266,7 @@ void UserInput()
     cout << "Number of ADD/ADDI Stations: "; cin >> ADD_UNITS;
     cout << "Number of NAND Stations: "; cin >> NAND_UNITS;
     cout << "Number of Multiplication Stations: "; cin >> MUL_UNITS;
+    cout << "Number of ROB entries:"; cin >> ROB_ENTRIES;
     cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
     cout << "Initializing Hardware...\n";
     loadStation.resize(LOAD_UNITS);
@@ -269,6 +276,7 @@ void UserInput()
     addStation.resize(ADD_UNITS);
     nandStation.resize(NAND_UNITS);
     mulStation.resize(MUL_UNITS);
+    ROB.resize(ROB_ENTRIES);
 
     Stations["LW"] = &loadStation;
     Stations["SW"] = &storeStation;
@@ -300,6 +308,51 @@ void UserInput()
     Stations_Time["MUL"] = MUL_UNITS_CYCLES;
 }
 
+void RollBack(int correctPC) //to be called on misprediction (when branching)
+{
+    while (ROB_head != ROB_tail) 
+    {
+        ROBEntry& entry = ROB[ROB_head];
+        if (entry.speculative)
+        {
+            for(auto &i : RF)
+            {
+                if(i.Qi == &entry)
+                {
+                    clearRegister(&i);
+                }
+            }
+            clearROB(&entry);
+            ROB_head = (ROB_head + 1) % ROB.size();
+        }
+        else
+        {
+            break; //stop clearing once we encounter non-speculative entries
+        }
+    }
+
+    if(ROB_head == ROB_tail) //handle case where head reaches tail
+    {
+        ROBEntry& entry = ROB[ROB_head];
+        if (entry.speculative)
+        {
+            clearROB(&entry);
+            ROB_head = (ROB_head + 1) % ROB.size();
+        }
+    }
+
+    for(auto &stationGroup : Stations) //clear all reservation stations not needed anymore
+    {
+        for(auto &station : *stationGroup.second)
+        {
+            if(station.speculative)
+                station.flush();
+        }
+    }
+
+    PC = correctPC;
+}
+
 int ISSUE()
 {
     if(PC/4 >= Instructions.size())
@@ -323,7 +376,7 @@ int ISSUE()
 
             ROBEntry& robEntry = ROB[ROB_tail];
             ROB_tail = (ROB_tail + 1) % ROB_ENTRIES == ROB_head ? ROB_tail : (ROB_tail + 1) % ROB_ENTRIES;
-            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false};
+            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false, speculate};
             RF[currentInst.dest].Qi = &robEntry;
             RF[currentInst.dest].busy = true;
 
@@ -334,15 +387,16 @@ int ISSUE()
             station.Vj = (station.Qj == nullptr) ? RF[currentInst.src1].value : 0;
             station.Vk = (station.Qk == nullptr) ? RF[currentInst.src2].value : 0;
             station.A = currentInst.dest;
-
+            station.speculative = speculate;
+            if(currentInst.Op == "BEQ")
+                speculate = 1;
             cout << "Issued instruction: " << currentInst.Op << " to a reservation station.\n";
             PC += 4; 
             return 1;
         }
     }
     cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
-    return -1;
-    
+    return -1;   
 }
 
 int main() {

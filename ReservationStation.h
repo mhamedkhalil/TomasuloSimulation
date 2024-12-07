@@ -2,7 +2,7 @@
 #include<vector>
 using namespace std;
 
-#define ROB_ENTRIES 6
+int ROB_ENTRIES;
 
 struct ROBEntry 
 {
@@ -11,10 +11,19 @@ struct ROBEntry
     int dest;                 
     int value;                
     bool ready;               
-    bool free = 1;               
+    bool free = 1;
+    bool speculative = 0;               
 };
-vector<ROBEntry> ROB(ROB_ENTRIES);
+vector<ROBEntry> ROB;
 int ROB_head = 0, ROB_tail = 0;
+void clearROB(ROBEntry* entry)
+{
+    entry->Op = "";
+    entry->free = 1;
+    entry->ready = 0;
+    entry->speculative = 0;
+    entry->value = 0;
+}
 
 class reservationStation
 {
@@ -25,6 +34,7 @@ class reservationStation
     ROBEntry* Qk;
     int A;
     bool Busy;
+    bool speculative;
 
     reservationStation()
     {
@@ -34,7 +44,8 @@ class reservationStation
         Qj = nullptr;
         Qk = nullptr;
         A  = -1;
-        Busy  = 0;
+        Busy = 0;
+        speculative = 0;
     }
 
     bool execute()
@@ -53,6 +64,6 @@ class reservationStation
         this->Qk = NULL;
         this->A  = -1;
         this->Busy  = 0;
+        this->speculative = 0;
     }
-
 };
