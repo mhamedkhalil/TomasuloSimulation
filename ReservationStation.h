@@ -4,26 +4,55 @@ using namespace std;
 
 int ROB_ENTRIES;
 
-struct ROBEntry 
+class reservationStation;
+class ROBEntry
 {
+    public:
     int id;                  
     string Op;              
     int dest;                 
     int value;                
     bool ready;               
     bool free = 1;
-    bool speculative = 0;               
+    bool speculative = 0; 
+    reservationStation* station;
+
+    ROBEntry()
+    {
+        id = -1;
+        Op = "";
+        dest = 0;
+        value = 0;
+        ready = 0;
+        free = 1;
+        speculative = 0;
+        station = nullptr;
+    }
+
+    ROBEntry(int ID, string OP, int DEST, int VALUE, bool READY, bool FREE, bool SPECULATIVE, reservationStation* STATION)
+    {
+        id = ID;
+        Op = OP;
+        dest = DEST;
+        value = VALUE;
+        ready = READY;
+        free = FREE;
+        station = STATION;
+        speculative = SPECULATIVE;
+    }
+
+    void clearROB()
+    {
+        this->Op = "";
+        this->free = 1;
+        this->ready = 0;
+        this->speculative = 0;
+        this->value = 0;
+        this->station = nullptr;
+    }
 };
 vector<ROBEntry> ROB;
 int ROB_head = 0, ROB_tail = 0;
-void clearROB(ROBEntry* entry)
-{
-    entry->Op = "";
-    entry->free = 1;
-    entry->ready = 0;
-    entry->speculative = 0;
-    entry->value = 0;
-}
 
 class reservationStation
 {
@@ -57,15 +86,22 @@ class reservationStation
         return 0;
     }
 
+    bool write()
+    {
+        if(this != nullptr && this->Busy && this->remainingTime == 0)
+            return 1;
+        return 0;
+    }
+
     void flush()
     {
         this->Op = "";
         this->Vj = -1;
         this->Vk = -1;
-        this->Qj = NULL;
-        this->Qk = NULL;
+        this->Qj = nullptr;
+        this->Qk = nullptr;
         this->A  = -1;
-        this->Busy  = 0;
+        this->Busy = 0;
         this->speculative = 0;
         this->remainingTime = 0;
     }

@@ -276,7 +276,7 @@ void UserInput()
     addStation.resize(ADD_UNITS);
     nandStation.resize(NAND_UNITS);
     mulStation.resize(MUL_UNITS);
-    ROB.resize(ROB_ENTRIES);
+    ROB.resize(ROB_ENTRIES,ROBEntry());
 
     Stations["LW"] = &loadStation;
     Stations["SW"] = &storeStation;
@@ -322,7 +322,7 @@ void RollBack(int correctPC) //to be called on misprediction (when branching)
                     clearRegister(&i);
                 }
             }
-            clearROB(&entry);
+            entry.clearROB();
             ROB_head = (ROB_head + 1) % ROB.size();
         }
         else
@@ -336,7 +336,7 @@ void RollBack(int correctPC) //to be called on misprediction (when branching)
         ROBEntry& entry = ROB[ROB_head];
         if (entry.speculative)
         {
-            clearROB(&entry);
+            entry.clearROB();
             ROB_head = (ROB_head + 1) % ROB.size();
         }
     }
@@ -374,7 +374,7 @@ int ISSUE()
 
             ROBEntry& robEntry = ROB[ROB_tail];
             ROB_tail = (ROB_tail + 1) % ROB_ENTRIES == ROB_head ? ROB_tail : (ROB_tail + 1) % ROB_ENTRIES;
-            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false, speculate};
+            robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false, speculate, &station};
 
             RF[currentInst.dest].Qi = &robEntry;
             RF[currentInst.dest].busy = true;
@@ -401,6 +401,7 @@ int ISSUE()
     cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
     return -1;   
 }
+
 void EXECUTE() {
     for (auto& stationGroup : Stations) {
         for (auto& station : *stationGroup.second) {
@@ -438,7 +439,6 @@ void EXECUTE() {
                 else if (station.Op == "LW") {
                     if(station.remainingTime == LOAD_UNITS_CYCLES - ADD_UNITS_CYCLES)
                     {
-                        cout << "Old station.A: " << station.A << endl;
                         station.A = station.A + station.Vj;
                         cout << "Computed Address of " << station.Op << " " << station.A << endl;
                         cout << "Clock: " << Clock << endl;
@@ -449,7 +449,8 @@ void EXECUTE() {
                     cout << "Executed LW: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
-                    station.remainingTime--;
+                    else 
+                        station.remainingTime--;
                 }
                 else if (station.Op == "SW") {
                    if(station.remainingTime == STORE_UNITS_CYCLES - ADD_UNITS_CYCLES)
@@ -459,7 +460,7 @@ void EXECUTE() {
                         cout << "Clock: " << Clock << endl;
                     }
                     if(station.remainingTime == 0) {
-                    DM[station.A] = station.Vk; 
+                    station.Vj = station.Vk; 
                     cout << "Executed SW: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
@@ -485,6 +486,8 @@ void EXECUTE() {
                             }
                         }
                     }
+                    else
+                        station.remainingTime--;
                 }
                 else if (station.Op == "JAL") {
                     if(station.remainingTime == 0) {
@@ -492,6 +495,8 @@ void EXECUTE() {
                     station.Vj = PC + 4; 
                     cout << "Executed JAL: Jumping to " << PC << endl;
                     }
+                    else
+                        station.remainingTime--;
                 }
 
                 // if (station.Op == "LW" || station.Op == "ADD" || station.Op == "ADDI"
@@ -508,10 +513,48 @@ void EXECUTE() {
     cout << "No instructions ready for execution.\n";
 }
 
+void WB() {
+
+    for(auto &rob : ROB)
+    {
+        // cout << "rob" << " result: " << rob.station->write() << endl;
+        if(rob.station->write())
+        {
+            rob.value = rob.station->Vj;
+            rob.ready = 1;
+            cout << "Wrote result of " << rob.station->Op << " to ROB" << endl;
+            rob.station->flush();
+        }
+    }
+
+    for(auto &stationGroup : Stations)
+    {
+        for(auto &station : *stationGroup.second)
+        {
+            if(station.Busy)
+            {
+                if(station.Qj != nullptr && station.Qj->ready)
+                {
+                    station.Vj = station.Qj->value;
+                    cout << "Assigned value of " << station.Qj->Op << " to pending " << station.Op << endl;
+                    station.Qj = nullptr;
+                }
+                if(station.Qk != nullptr && station.Qk->ready)
+                {
+                    station.Vk = station.Qk->value;
+                    cout << "Assigned value of " << station.Qk->Op << " to pending " << station.Op << endl;
+                    station.Qk = nullptr;
+                }
+            }
+        }
+    }
+    cout << "No instructions ready for write-back.\n"; 
+}
 
 int main() {
 
     UserInput();
+
     RF[0].value = 0;
     RF[0].busy = 0;
     RF[0].Qi = nullptr;
@@ -533,7 +576,7 @@ int main() {
              << "src2=" << inst.src2 << endl;
     }
 
-    cout << "=== Starting Issuance ===\n";
+    cout << "=== Starting Program ===\n";
     while (true) {
         int result = ISSUE();
 
@@ -547,6 +590,7 @@ int main() {
         }
 
         EXECUTE();
+        WB();
 
         // Simulate clock tick
         Clock++;
