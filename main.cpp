@@ -497,16 +497,7 @@ void EXECUTE() {
                     }
                     else
                         station.remainingTime--;
-                }
-
-                // if (station.Op == "LW" || station.Op == "ADD" || station.Op == "ADDI"
-                //     || station.Op == "NAND" || station.Op == "MUL") {
-                //     RF[station.A].value = station.Vj; 
-                //     RF[station.A].Qi = nullptr; 
-                //     RF[station.A].busy = false;
-                // }
-                //cout << "Execution completed for instruction: " << station.Op << " with result: " << station.Vj << endl;
-                //return 1; 
+                } 
             }
         }
     }
@@ -522,7 +513,7 @@ void WB() {
         {
             rob.value = rob.station->Vj;
             rob.ready = 1;
-            cout << "Wrote result of " << rob.station->Op << " to ROB" << endl;
+            cout << "Wrote result of " << rob.station->Op << " (" << rob.station->Vj << ")" << endl;
             rob.station->flush();
         }
     }
@@ -549,6 +540,24 @@ void WB() {
         }
     }
     cout << "No instructions ready for write-back.\n"; 
+}
+
+void COMMIT()
+{
+    ROBEntry& ROBhead = ROB[ROB_head];
+    if(ROBhead.ready)
+    {
+
+        if(ROBhead.dest != 0 && RF[ROBhead.dest].busy && RF[ROBhead.dest].Qi == &ROB[ROB_head])
+        {
+            RF[ROBhead.dest].value = ROB[ROB_head].value;
+            cout << "Committed ROB value " << ROB[ROB_head].value << " to " << ROB[ROB_head].dest << endl;
+            RF[ROBhead.dest].Qi = nullptr;
+            RF[ROBhead.dest].busy = 0;
+        }
+        ROBhead.clearROB();
+        ROB_head = (ROB_head + 1) % ROB_ENTRIES;
+    }
 }
 
 int main() {
@@ -582,7 +591,6 @@ int main() {
 
         if (result == 0) {
             cout << "All instructions issued successfully.\n";
-            break;
         } else if (result == -1) {
             cout << "Stall detected. Unable to issue instruction.\n";
         } else if (result == 1) {
@@ -591,6 +599,7 @@ int main() {
 
         EXECUTE();
         WB();
+        COMMIT();
 
         // Simulate clock tick
         Clock++;
@@ -599,11 +608,15 @@ int main() {
             break;
         }
     }
-
-    // Step 5: Final status
+    cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
     cout << "\nFinal PC: " << PC << endl;
     cout << "Total Clock Cycles: " << Clock << endl;
-
+    cout << "Final Registers content:\n";
+    for(int i=0; i<16; i++)
+    {
+        cout << i << ": " << RF[i].value << endl;
+    }
+    cout << "DM[16]: " << DM[16] << endl;
     return 0;
 }
   
