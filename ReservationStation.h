@@ -65,6 +65,7 @@ class reservationStation
     bool Busy;
     bool speculative;
     int remainingTime;
+    bool ready;
 
     reservationStation()
     {
@@ -77,6 +78,7 @@ class reservationStation
         Busy = 0;
         speculative = 0;
         remainingTime = 0;
+        ready = 0;
     }
 
     bool execute()
@@ -88,7 +90,7 @@ class reservationStation
 
     bool write()
     {
-        if(this != nullptr && this->Busy && this->remainingTime == 0)
+        if(this != nullptr && this->Busy && this->ready)
             return 1;
         return 0;
     }
@@ -104,5 +106,6 @@ class reservationStation
         this->Busy = 0;
         this->speculative = 0;
         this->remainingTime = 0;
+        this->ready = 0;
     }
 };

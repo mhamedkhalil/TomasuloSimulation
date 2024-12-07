@@ -381,6 +381,7 @@ int ISSUE()
 
             station.Op = currentInst.Op;
             station.Busy = true;
+            station.ready = false;
             station.Qj = RF[currentInst.src1].Qi;
             station.Qk = RF[currentInst.src2].Qi;
             station.Vj = (station.Qj == nullptr) ? RF[currentInst.src1].value : 0;
@@ -412,6 +413,7 @@ void EXECUTE() {
                     if(station.remainingTime == 0)
                     {
                         station.Vj = station.Vj + station.Vk;
+                        station.ready = 1;
                         cout << "Executed ADD/ADDI: " << station.Vj << endl;
                         cout << "Clock: " << Clock << endl;
                     }
@@ -421,6 +423,7 @@ void EXECUTE() {
                 else if (station.Op == "NAND") {
                     if(station.remainingTime == 0) {
                     station.Vj = ~(station.Vj & station.Vk); 
+                    station.ready = 1;
                     cout << "Executed NAND: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
@@ -430,6 +433,7 @@ void EXECUTE() {
                 else if (station.Op == "MUL") {
                     if(station.remainingTime == 0) {
                     station.Vj = station.Vj * station.Vk;
+                    station.ready = 1;
                     cout << "Executed MUL: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
@@ -446,11 +450,13 @@ void EXECUTE() {
                     if(station.remainingTime == 0) {
                     cout << "DM content: " << DM[station.A] << endl;
                     station.Vj = DM[station.A];
+                    station.ready = 1;
                     cout << "Executed LW: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
-                    else 
+                    else {
                         station.remainingTime--;
+                        }
                 }
                 else if (station.Op == "SW") {
                    if(station.remainingTime == STORE_UNITS_CYCLES - ADD_UNITS_CYCLES)
@@ -460,7 +466,8 @@ void EXECUTE() {
                         cout << "Clock: " << Clock << endl;
                     }
                     if(station.remainingTime == 0) {
-                    station.Vj = station.Vk; 
+                    station.Vj = station.Vk;
+                    station.ready = 1; 
                     cout << "Executed SW: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
                     }
@@ -469,7 +476,8 @@ void EXECUTE() {
                 else if (station.Op == "BEQ") {
                     if(station.remainingTime == 0) {
                         if (station.Vj == station.Vk) {
-                            RollBack(station.A); 
+                            RollBack(station.A);
+                            station.ready = 1; 
                             cout << "Executed BEQ: Branching to " << PC << endl;
                             cout << "Rolling Back!" << endl;
                             cout << "Clock: " << Clock << endl;
@@ -492,7 +500,8 @@ void EXECUTE() {
                 else if (station.Op == "JAL") {
                     if(station.remainingTime == 0) {
                     PC = station.A*4;
-                    station.Vj = PC + 4; 
+                    station.Vj = PC + 4;
+                    station.ready = 1; 
                     cout << "Executed JAL: Jumping to " << PC << endl;
                     }
                     else
