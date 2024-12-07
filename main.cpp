@@ -385,7 +385,10 @@ int ISSUE()
             station.Qk = RF[currentInst.src2].Qi;
             station.Vj = (station.Qj == nullptr) ? RF[currentInst.src1].value : 0;
             station.Vk = (station.Qk == nullptr) ? RF[currentInst.src2].value : 0;
-            station.A = currentInst.dest;
+            if(station.Op == "LW")
+                station.A = currentInst.src2;
+            else 
+                station.A = currentInst.dest;
             station.speculative = speculate;
             station.remainingTime = Stations_Time[station.Op];
             if(currentInst.Op == "BEQ")
@@ -435,11 +438,13 @@ void EXECUTE() {
                 else if (station.Op == "LW") {
                     if(station.remainingTime == LOAD_UNITS_CYCLES - ADD_UNITS_CYCLES)
                     {
+                        cout << "Old station.A: " << station.A << endl;
                         station.A = station.A + station.Vj;
-                        cout << "Computed Address of " << station.Op << endl;
+                        cout << "Computed Address of " << station.Op << " " << station.A << endl;
                         cout << "Clock: " << Clock << endl;
                     }
                     if(station.remainingTime == 0) {
+                    cout << "DM content: " << DM[station.A] << endl;
                     station.Vj = DM[station.A];
                     cout << "Executed LW: " << station.Vj << endl;
                     cout << "Clock: " << Clock << endl;
@@ -507,6 +512,12 @@ void EXECUTE() {
 int main() {
 
     UserInput();
+    RF[0].value = 0;
+    RF[0].busy = 0;
+    RF[0].Qi = nullptr;
+    DM[0] = 1;
+    DM[1] = 2;
+    DM[11] = 3;
     // Create a sample instruction file
     string fileName = "instructions.txt";
     // Parse the file
@@ -539,7 +550,7 @@ int main() {
 
         // Simulate clock tick
         Clock++;
-        if (Clock > 100) {
+        if (Clock > 30) {
             cout << "Exceeded clock limit. Stopping simulation.\n";
             break;
         }
