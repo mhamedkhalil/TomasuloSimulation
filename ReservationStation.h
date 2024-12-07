@@ -35,6 +35,7 @@ class reservationStation
     int A;
     bool Busy;
     bool speculative;
+    int remainingTime;
 
     reservationStation()
     {
@@ -46,11 +47,12 @@ class reservationStation
         A  = -1;
         Busy = 0;
         speculative = 0;
+        remainingTime = 0;
     }
 
     bool execute()
     {
-        if(this->Qj == NULL && this->Qk == NULL)
+        if(this->Busy && this->Qj == nullptr && this->Qk == nullptr)
             return 1;
         return 0;
     }
@@ -65,5 +67,6 @@ class reservationStation
         this->A  = -1;
         this->Busy  = 0;
         this->speculative = 0;
+        this->remainingTime = 0;
     }
 };

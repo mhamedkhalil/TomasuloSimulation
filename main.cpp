@@ -351,6 +351,7 @@ void RollBack(int correctPC) //to be called on misprediction (when branching)
     }
 
     PC = correctPC;
+    speculate = 0;
 }
 
 int ISSUE()
@@ -364,9 +365,6 @@ int ISSUE()
     {
         if(!station.Busy)
         {
-            cout << "Head: " << ROB_head << endl;
-                cout << "Tail: " << ROB_tail << endl;
-                cout << "Free: " << ROB[ROB_tail].free << endl;
             
             if ((ROB_tail + 1) % ROB_ENTRIES == ROB_head && !ROB[ROB_tail].free) 
             {
@@ -377,6 +375,7 @@ int ISSUE()
             ROBEntry& robEntry = ROB[ROB_tail];
             ROB_tail = (ROB_tail + 1) % ROB_ENTRIES == ROB_head ? ROB_tail : (ROB_tail + 1) % ROB_ENTRIES;
             robEntry = {PC / 4, currentInst.Op, currentInst.dest, 0, false, false, speculate};
+
             RF[currentInst.dest].Qi = &robEntry;
             RF[currentInst.dest].busy = true;
 
@@ -388,6 +387,7 @@ int ISSUE()
             station.Vk = (station.Qk == nullptr) ? RF[currentInst.src2].value : 0;
             station.A = currentInst.dest;
             station.speculative = speculate;
+            station.remainingTime = Stations_Time[station.Op];
             if(currentInst.Op == "BEQ")
                 speculate = 1;
             cout << "Issued instruction: " << currentInst.Op << " to a reservation station.\n";
@@ -398,6 +398,111 @@ int ISSUE()
     cout << "No available reservation station for instruction: " << currentInst.Op << " --> Stalling" << endl;
     return -1;   
 }
+void EXECUTE() {
+    for (auto& stationGroup : Stations) {
+        for (auto& station : *stationGroup.second) {
+          
+            if (station.execute()) {
+              
+                if (station.Op == "ADD" || station.Op == "ADDI") {
+                    if(station.remainingTime == 0)
+                    {
+                        station.Vj = station.Vj + station.Vk;
+                        cout << "Executed ADD/ADDI: " << station.Vj << endl;
+                        cout << "Clock: " << Clock << endl;
+                    }
+                    else 
+                        station.remainingTime--;
+                }
+                else if (station.Op == "NAND") {
+                    if(station.remainingTime == 0) {
+                    station.Vj = ~(station.Vj & station.Vk); 
+                    cout << "Executed NAND: " << station.Vj << endl;
+                    cout << "Clock: " << Clock << endl;
+                    }
+                    else 
+                        station.remainingTime--;
+                }
+                else if (station.Op == "MUL") {
+                    if(station.remainingTime == 0) {
+                    station.Vj = station.Vj * station.Vk;
+                    cout << "Executed MUL: " << station.Vj << endl;
+                    cout << "Clock: " << Clock << endl;
+                    }
+                    else 
+                        station.remainingTime--;
+                }
+                else if (station.Op == "LW") {
+                    if(station.remainingTime == LOAD_UNITS_CYCLES - ADD_UNITS_CYCLES)
+                    {
+                        station.A = station.A + station.Vj;
+                        cout << "Computed Address of " << station.Op << endl;
+                        cout << "Clock: " << Clock << endl;
+                    }
+                    if(station.remainingTime == 0) {
+                    station.Vj = DM[station.A];
+                    cout << "Executed LW: " << station.Vj << endl;
+                    cout << "Clock: " << Clock << endl;
+                    }
+                    station.remainingTime--;
+                }
+                else if (station.Op == "SW") {
+                   if(station.remainingTime == STORE_UNITS_CYCLES - ADD_UNITS_CYCLES)
+                    {
+                        station.A = station.A + station.Vj;
+                        cout << "Computed Address of " << station.Op << endl;
+                        cout << "Clock: " << Clock << endl;
+                    }
+                    if(station.remainingTime == 0) {
+                    DM[station.A] = station.Vk; 
+                    cout << "Executed SW: " << station.Vj << endl;
+                    cout << "Clock: " << Clock << endl;
+                    }
+                    station.remainingTime--;
+                }
+                else if (station.Op == "BEQ") {
+                    if(station.remainingTime == 0) {
+                        if (station.Vj == station.Vk) {
+                            RollBack(station.A); 
+                            cout << "Executed BEQ: Branching to " << PC << endl;
+                            cout << "Rolling Back!" << endl;
+                            cout << "Clock: " << Clock << endl;
+                        }
+                        else
+                        {
+                            cout << "BEQ predicted right! Proceeding normally" << endl;
+                            cout << "Clock: " << Clock << endl;
+                            speculate = 0;
+                            for(auto &entry : ROB)
+                            {
+                                if(entry.speculative)
+                                    entry.speculative = 0;
+                            }
+                        }
+                    }
+                }
+                else if (station.Op == "JAL") {
+                    if(station.remainingTime == 0) {
+                    PC = station.A*4;
+                    station.Vj = PC + 4; 
+                    cout << "Executed JAL: Jumping to " << PC << endl;
+                    }
+                }
+
+                // if (station.Op == "LW" || station.Op == "ADD" || station.Op == "ADDI"
+                //     || station.Op == "NAND" || station.Op == "MUL") {
+                //     RF[station.A].value = station.Vj; 
+                //     RF[station.A].Qi = nullptr; 
+                //     RF[station.A].busy = false;
+                // }
+                //cout << "Execution completed for instruction: " << station.Op << " with result: " << station.Vj << endl;
+                //return 1; 
+            }
+        }
+    }
+    cout << "No instructions ready for execution.\n";
+}
+
 
 int main() {
 
@@ -430,9 +535,11 @@ int main() {
             cout << "Instruction issued.\n";
         }
 
+        EXECUTE();
+
         // Simulate clock tick
         Clock++;
-        if (Clock > 30) {
+        if (Clock > 100) {
             cout << "Exceeded clock limit. Stopping simulation.\n";
             break;
         }
