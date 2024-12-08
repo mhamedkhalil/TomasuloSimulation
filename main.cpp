@@ -384,6 +384,7 @@ int ISSUE()
             station.ready = false;
             station.Qj = RF[currentInst.src1].Qi;
             station.Qk = RF[currentInst.src2].Qi;
+            cout << "DEBUG ISSUE: " << station.Qk << endl;
             station.Vj = (station.Qj == nullptr) ? RF[currentInst.src1].value : 0;
             station.Vk = (station.Qk == nullptr) ? RF[currentInst.src2].value : 0;
             if(station.Op == "LW")
@@ -531,19 +532,33 @@ void WB() {
     {
         for(auto &station : *stationGroup.second)
         {
+            // cout << "HEREEEE" << endl;
             if(station.Busy)
             {
-                if(station.Qj != nullptr && station.Qj->ready)
+                cout << "KHELLO 1" << endl;
+                try{
+                if(station.Qj != nullptr  && station.Qj->ready)
                 {
+                    cout << "KHELLO In 1" << endl;
                     station.Vj = station.Qj->value;
                     cout << "Assigned value of " << station.Qj->Op << " to pending " << station.Op << endl;
                     station.Qj = nullptr;
+                    cout << "HEREEE Qj" << endl;
                 }
+                cout << "KHELLO 2" << endl;
+                cout << "DEBUG STATION: " << station.Op << endl;
                 if(station.Qk != nullptr && station.Qk->ready)
                 {
+                    cout << "KHELLO In 2" << endl;
                     station.Vk = station.Qk->value;
                     cout << "Assigned value of " << station.Qk->Op << " to pending " << station.Op << endl;
                     station.Qk = nullptr;
+                    cout << "HEREEE Qk" << endl;
+                }
+                }
+                catch(exception&)
+                {
+                    continue;
                 }
             }
         }
@@ -551,23 +566,43 @@ void WB() {
     cout << "No instructions ready for write-back.\n"; 
 }
 
-void COMMIT()
-{
-    ROBEntry& ROBhead = ROB[ROB_head];
-    if(ROBhead.ready)
-    {
+void COMMIT(bool *allCommitted) {
 
-        if(ROBhead.dest != 0 && RF[ROBhead.dest].busy && RF[ROBhead.dest].Qi == &ROB[ROB_head])
-        {
-            RF[ROBhead.dest].value = ROB[ROB_head].value;
-            cout << "Committed ROB value " << ROB[ROB_head].value << " to " << ROB[ROB_head].dest << endl;
-            RF[ROBhead.dest].Qi = nullptr;
-            RF[ROBhead.dest].busy = 0;
+    if (ROB[ROB_head].free || !ROB[ROB_head].ready) {
+        cout << "No instruction ready to commit." << endl;
+        return;
+    }
+
+    ROBEntry& entry = ROB[ROB_head];
+
+    // Commit action depends on the operation type
+    if (entry.Op == "SW") {
+        // For store, write the value to memory
+        DM[entry.dest] = entry.value;
+        cout << "Committed SW: Address " << entry.dest << " updated with value " << entry.value << endl;
+    } else {
+        // For other operations, update the register file
+        if (entry.dest < REGISTER_NUM && entry.dest >= 0) {
+            RF[entry.dest].value = entry.value;
+            RF[entry.dest].Qi = nullptr;
+            RF[entry.dest].busy = false;
+            cout << "Committed " << entry.Op << ": Register r" << entry.dest << " updated with value " << entry.value << endl;
         }
-        ROBhead.clearROB();
-        ROB_head = (ROB_head + 1) % ROB_ENTRIES;
+    }
+
+    // Clear the ROB entry
+    entry.clearROB();
+    ROB_head = (ROB_head + 1) % ROB.size();
+
+    *allCommitted = true;
+    for (auto &i : ROB) {
+        if (!i.free) {
+            *allCommitted = false;
+            break;
+        }
     }
 }
+
 
 int main() {
 
@@ -593,13 +628,14 @@ int main() {
              << "src1=" << inst.src1 << ", "
              << "src2=" << inst.src2 << endl;
     }
-
+    bool allIssued = 0, allCommitted = 0;
     cout << "=== Starting Program ===\n";
     while (true) {
         int result = ISSUE();
 
         if (result == 0) {
             cout << "All instructions issued successfully.\n";
+            allIssued = 1;
         } else if (result == -1) {
             cout << "Stall detected. Unable to issue instruction.\n";
         } else if (result == 1) {
@@ -608,8 +644,11 @@ int main() {
 
         EXECUTE();
         WB();
-        COMMIT();
-
+        cout << "Before calling Commit" << endl;
+        COMMIT(&allCommitted);
+        cout << "After calling Commit" << endl;
+        if(allIssued && allCommitted)
+            break;
         // Simulate clock tick
         Clock++;
         if (Clock > 30) {
@@ -625,7 +664,7 @@ int main() {
     {
         cout << i << ": " << RF[i].value << endl;
     }
-    cout << "DM[16]: " << DM[16] << endl;
+    cout << "DM[17]: " << DM[17] << endl;
     return 0;
 }
   
